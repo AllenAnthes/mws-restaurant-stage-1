@@ -41,10 +41,8 @@ const onActivate = async () => {
             .map(cacheName => caches.delete(cacheName)))
 };
 
-
 self.addEventListener('fetch', (event) => {
     const requestUrl = new URL(event.request.url);
-    // console.log(`Request URL: ${requestUrl}`);
     if (requestUrl.origin === location.origin) {
         if (requestUrl.pathname.startsWith('/img/')) {
             event.respondWith(serveImage(event.request));
@@ -57,14 +55,7 @@ self.addEventListener('fetch', (event) => {
         return;
     }
 
-    event.respondWith(
-        caches.match(event.request).then((response) => {
-            if (response) {
-                console.log(`Responding from cache ${requestUrl}`)
-            }
-            return response || fetch(event.request).catch(e => `Error in fetch ${e}`);
-        }).catch(e => console.log(`error ${e}`))
-    );
+    event.respondWith(checkAllCaches(event, requestUrl));
 });
 
 async function serveImage(request) {
@@ -73,7 +64,6 @@ async function serveImage(request) {
     const response = await cache.match(storageUrl);
     if (response) {
         console.log(`Responding from IMAGE cache ${request.url}`);
-
         return response;
     }
 
@@ -93,4 +83,13 @@ async function serveMapImage(request) {
     const networkResponse = await fetch(request);
     await cache.put(request, networkResponse.clone());
     return networkResponse;
+}
+
+async function checkAllCaches(event, requestUrl) {
+    const response = await caches.match(event.request);
+    if (response) {
+        console.log(`Responding from any cache ${requestUrl}`);
+        return response;
+    }
+    return fetch(event.request).catch(e => `Error in fetch ${e}`);
 }

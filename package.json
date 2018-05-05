@@ -1,0 +1,25 @@
+{
+  "name": "mws-restaurant-stage-1",
+  "version": "1.0.0",
+  "description": "---\r #### _Three Stage Course Material Project - Restaurant Reviews_",
+  "main": "index.html",
+  "scripts": {
+    "start": "nodemon --exec npm run babel-node -- ./app.js",
+    "babel-node": "babel-node --presets=latest"
+  },
+  "dependencies": {
+    "cors": "^2.8.4",
+    "express": "^4.16.3",
+    "gulp": "^3.9.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-latest": "^6.24.1",
+    "nodemon": "^1.17.3"
+  },
+  "babel": {
+    "presets": [
+      "latest"
+    ]
+  }
+}
