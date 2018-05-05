@@ -4,5 +4,5 @@
 
 # IntelliJ project files
 .idea
-out
-gen
+node_modules/
+yarn.lock

@@ -24,7 +24,6 @@ app.get('/service-worker.js', (req, res) => {
 });
 
 app.get('/', (req, res) => {
-    console.log('hit');
     res.status(200).sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
