@@ -1,4 +1,4 @@
-const staticCacheName = 'restaurant-static-v2';
+const staticCacheName = 'restaurant-static-v1';
 const googleMapsCache = 'restaurant-maps-v1';
 const imageCacheName = 'restaurant-images-v1';
 const allCaches = [
@@ -7,49 +7,52 @@ const allCaches = [
     googleMapsCache
 ];
 
-self.addEventListener('install', function (event) {
-    console.log('installing');
-    event.waitUntil(
-        caches.open(staticCacheName).then(function (cache) {
-            return cache.addAll([
-                '/',
-                '/index.html',
-                '/js/main.js',
-                '/js/dbhelper.js',
-                '/js/restaurant_info.js',
-                '/css/styles.css',
-                '/css/restaurant.css',
-                '/data/restaurants.json',
-            ]).catch(e => console.log(`Cache error ${e}`));
-        })
-    );
-    console.log('done installing');
+self.addEventListener('install', (event) => {
+    console.log('Installing SW');
+    event.waitUntil(onInstalling(staticCacheName));
+    console.log('Done installing SW');
 });
 
-self.addEventListener('activate', async (event) => {
-    console.log('activating');
-    event.waitUntil((async () => {
-            const cacheNames = await caches.keys();
-            return Promise.all(
-                cacheNames.filter(cacheName => (
-                    cacheName.startsWith('restaurant-') && !allCaches.includes(cacheName)
-                )).map(cacheName => caches.delete(cacheName)))
-        })()
-    )
+
+const onInstalling = async (staticCacheName) => {
+    const cache = await caches.open(staticCacheName);
+    return cache.addAll([
+        '/',
+        '/js/main.js',
+        '/js/dbhelper.js',
+        '/js/restaurant_info.js',
+        '/css/styles.css',
+        '/css/restaurant.css',
+        '/data/restaurants.json',
+    ])
+};
+
+self.addEventListener('activate', (event) => {
+    console.log('Activating SW');
+    event.waitUntil(onActivate());
+    console.log('Done activating SW');
+
 });
 
-self.addEventListener('fetch', function (event) {
+const onActivate = async () => {
+    const cacheNames = await caches.keys();
+    return Promise.all(
+        cacheNames.filter(cacheName => (cacheName.startsWith('restaurant-') && !allCaches.includes(cacheName)))
+            .map(cacheName => caches.delete(cacheName)))
+};
+
+
+self.addEventListener('fetch', (event) => {
     const requestUrl = new URL(event.request.url);
     // console.log(`Request URL: ${requestUrl}`);
     if (requestUrl.origin === location.origin) {
-
         if (requestUrl.pathname.startsWith('/img/')) {
             event.respondWith(serveImage(event.request));
             return;
         }
     }
 
-    if (requestUrl.href.indexOf('https://maps.googleapi.com/maps')) {
+    if (requestUrl.href.startsWith('https://maps.googleapis.com/maps')) {
         event.respondWith(serveMapImage(event.request));
         return;
     }
@@ -75,18 +78,19 @@ async function serveImage(request) {
     }
 
     const networkResponse = await fetch(request);
-    const res = await cache.put(storageUrl, networkResponse.clone());
-    console.log(res);
-
+    await cache.put(storageUrl, networkResponse.clone());
     return networkResponse;
 }
 
 async function serveMapImage(request) {
     const cache = await caches.open(googleMapsCache);
     const response = await cache.match(request.url);
-    if (response) return response;
+    if (response) {
+        console.log(`Responding from MAP cache ${request.url}`);
+        return response;
+    }
 
     const networkResponse = await fetch(request);
-    const res = await cache.put(request, networkResponse.clone());
+    await cache.put(request, networkResponse.clone());
     return networkResponse;
 }

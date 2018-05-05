@@ -24,10 +24,10 @@
     <section>
       <div class="filter-options">
         <h2>Filter Results</h2>
-        <select id="neighborhoods-select" name="neighborhoods" onchange="updateRestaurants()">
+        <select id="neighborhoods-select" name="neighborhoods" aria-label="filter by neighborhoods" onchange="updateRestaurants()">
           <option value="all">All Neighborhoods</option>
         </select>
-        <select id="cuisines-select" name="cuisines" onchange="updateRestaurants()">
+        <select id="cuisines-select" name="cuisine" aria-label="filter by cuisine" onchange="updateRestaurants()">
           <option value="all">All Cuisines</option>
         </select>
       </div>
@@ -37,7 +37,6 @@
 
   <script type="application/javascript" charset="utf-8" src="js/dbhelper.js"></script>
   <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap"></script>
-  <!--<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap"></script>-->
 
 
   <footer id="footer">
