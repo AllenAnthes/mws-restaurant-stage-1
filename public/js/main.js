@@ -126,9 +126,7 @@ resetRestaurants = (restaurants) => {
  */
 fillRestaurantsHTML = (restaurants = self.restaurants) => {
     const ul = document.getElementById('restaurants-list');
-    restaurants.forEach(restaurant => {
-        ul.append(createRestaurantHTML(restaurant));
-    });
+    restaurants.forEach(restaurant => ul.append(createRestaurantHTML(restaurant)));
     addMarkersToMap();
 };
 
@@ -139,6 +137,7 @@ createRestaurantHTML = (restaurant) => {
     const li = document.createElement('li');
 
     const image = document.createElement('img');
+    image.setAttribute('alt', '');
     image.className = 'restaurant-img';
     image.src = DBHelper.imageUrlForRestaurant(restaurant);
     li.append(image);
@@ -156,7 +155,7 @@ createRestaurantHTML = (restaurant) => {
     li.append(address);
 
     const more = document.createElement('a');
-    more.setAttribute('Role', 'Button');
+    more.setAttribute('Role', 'button');
     more.innerHTML = 'View Details';
     more.href = DBHelper.urlForRestaurant(restaurant);
     more.setAttribute('aria-label', `View details for ${restaurant.name}`);
@@ -172,9 +171,7 @@ addMarkersToMap = (restaurants = self.restaurants) => {
     restaurants.forEach(restaurant => {
         // Add marker to the map
         const marker = DBHelper.mapMarkerForRestaurant(restaurant, self.map);
-        google.maps.event.addListener(marker, 'click', () => {
-            window.location.href = marker.url
-        });
+        google.maps.event.addListener(marker, 'click', () => window.location.href = marker.url);
         self.markers.push(marker);
     });
 };
@@ -185,7 +182,7 @@ addMarkersToMap = (restaurants = self.restaurants) => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('/service-worker.js')
+            const registration = await navigator.serviceWorker.register('/service-worker.js');
             console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
         } catch (e) {
             console.log(`Serviceworker registration failed.`)
