@@ -9,18 +9,18 @@ import path from 'path'
 
 const app = express();
 app.use(cors());
-app.use(express.static(path.join(__dirname, "public")));
+app.use(express.static(path.join(__dirname, 'public')));
 
 
 /**
  * Route created so we can add CORS header
  */
 app.get('/data/restaurants.json', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'data', 'restaurants.json'))
+    res.sendFile(path.join(__dirname, 'public', 'data', 'restaurants.json'));
 });
 
 app.get('/service-worker.js', (req, res) => {
-    res.sendFile(path.join(__dirname, 'service-worker.js'))
+    res.sendFile(path.join(__dirname, 'service-worker.js'));
 });
 
 app.get('/', (req, res) => {
@@ -29,5 +29,5 @@ app.get('/', (req, res) => {
 
 const port = 8000;
 app.listen(port, () => {
-    console.log(`Up on ${port}`)
+    console.log(`Up on ${port}`);
 });

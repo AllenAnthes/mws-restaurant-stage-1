@@ -4,9 +4,11 @@
 <head>
   <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
   <meta charset="utf-8">
-  <script type="application/javascript" charset="utf-8" src="js/main.js"></script>
+  <meta name="theme-color" content="#317EFB"/>
   <link rel="stylesheet" src="//normalize-css.googlecode.com/svn/trunk/normalize.css" />
+  <link rel="manifest" href="/manifest.json">
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/progressive-image.min.css">
   <title>Restaurant Reviews</title>
 </head>
 
@@ -19,7 +21,7 @@
 
   <main id="maincontent">
     <section id="map-container">
-      <div id="map" role="application"></div>
+      <div id="map" role="application" aria-label="Map with Restaurants"></div>
     </section>
     <section>
       <div class="filter-options">
@@ -35,8 +37,6 @@
     </section>
   </main>
 
-  <script type="application/javascript" charset="utf-8" src="js/dbhelper.js"></script>
-  <script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap"></script>
 
 
   <footer id="footer">
@@ -44,5 +44,11 @@
   </footer>
 
 </body>
+<script src="https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js"></script>
+<script type="application/javascript" charset="utf-8" src="js/dbhelper.js"></script>
+<script type="application/javascript" charset="utf-8" src="js/main.js"></script>
+<script type="application/javascript" src="js/progressive-image.js"></script>
+<script async defer src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap"></script>
+
 
 </html>

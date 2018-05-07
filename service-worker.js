@@ -16,13 +16,15 @@ const onInstalling = async (staticCacheName) => {
     const cache = await caches.open(staticCacheName);
     return cache.addAll([
         '/',
+        '/restaurant.html',
         '/js/main.js',
         '/js/dbhelper.js',
         '/js/restaurant_info.js',
+        '/js/progressive-image.js',
         '/css/styles.css',
         '/css/restaurant.css',
-        '/data/restaurants.json',
-    ])
+        '/css/progressive-image.min.css'
+    ]);
 };
 
 self.addEventListener('install', (event) => {
@@ -38,8 +40,8 @@ self.addEventListener('install', (event) => {
 const onActivate = async () => {
     const cacheNames = await caches.keys();
     return Promise.all(
-        cacheNames.filter(cacheName => (cacheName.startsWith('restaurant-') && !allCaches.includes(cacheName)))
-            .map(cacheName => caches.delete(cacheName)))
+        cacheNames.filter(cacheName => cacheName.startsWith('restaurant-') && !allCaches.includes(cacheName))
+            .map(cacheName => caches.delete(cacheName)));
 };
 
 self.addEventListener('activate', (event) => {
@@ -56,20 +58,29 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
     const request = event.request;
     const requestUrl = new URL(event.request.url);
+
     if (requestUrl.origin === location.origin) {
         if (requestUrl.pathname.startsWith('/img/')) {
             const storageUrl = request.url.replace(/-\d+px\.jpg$/, '');
-            event.respondWith(serveFromCache(request, storageUrl, imageCacheName));
+            event.respondWith(
+                serveFromCache(request, storageUrl, imageCacheName)
+            );
+            return;
+        }
+
+        if (requestUrl.pathname.startsWith('/restaurant.html')) {
+            event.respondWith(serveFromCache(request, '/restaurant.html', staticCacheName));
             return;
         }
     }
-
     if (requestUrl.href.startsWith('https://maps.googleapis.com/maps')) {
-        event.respondWith(serveFromCache(event.request, event.request.url, googleMapsCache));
+        event.respondWith(
+            serveFromCache(event.request, event.request.url, googleMapsCache)
+        );
         return;
     }
 
-    event.respondWith(checkAllCaches(event, requestUrl));
+    event.respondWith(checkAllCaches(event.request));
 });
 
 
@@ -87,7 +98,7 @@ async function serveFromCache(request, url, cacheName) {
     const cache = await caches.open(cacheName);
     const response = await cache.match(url);
     if (response) {
-        console.log(`Responding from ${cacheName}: ${url}`);
+        // console.log(`Responding from ${cacheName}: ${url}`);
         return response;
     }
     try {
@@ -95,21 +106,25 @@ async function serveFromCache(request, url, cacheName) {
         await cache.put(url, networkResponse.clone());
         return networkResponse;
     } catch (ex) {
-        console.warn(`Error while attempting to fetch from network. ${ex}`)
+        console.warn(`Error while attempting to fetch from network. ${ex}`);
     }
 }
 
 
 /**
  * Utility function checks all caches for request and returns that or network response
- * @param event
- * @param requestUrl
+ * @param request
  */
-async function checkAllCaches(event, requestUrl) {
-    const response = await caches.match(event.request);
+async function checkAllCaches(request) {
+    const response = await caches.match(request);
     if (response) {
-        console.log(`Responding from any cache ${requestUrl}`);
         return response;
     }
-    return await fetch(event.request);
+
+    try {
+        return await fetch(request);
+    } catch (e) {
+        console.warn(`Cache missed and network fetch threw error: ${e}\nRequest URL: ${request.url}`);
+        return new Response();
+    }
 }

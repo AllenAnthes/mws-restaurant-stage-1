@@ -3,11 +3,14 @@
 
 <head>
     <meta name="viewport" content="width=device-width, minimum-scale=1.0, initial-scale=1.0, user-scalable=yes">
+    <meta name="theme-color" content="#317EFB"/>
+    <link rel="manifest" href="/manifest.json">
     <!-- Normalize.css for better cross-browser consistency -->
     <link rel="stylesheet" src="//normalize-css.googlecode.com/svn/trunk/normalize.css"/>
     <!-- Main CSS file -->
     <link rel="stylesheet" href="css/styles.css" type="text/css">
     <link rel="stylesheet" href="css/restaurant.css" type="text/css">
+    <link rel="stylesheet" href="css/progressive-image.min.css">
     <title>Restaurant Info</title>
 </head>
 
@@ -31,14 +34,14 @@
 <main id="maincontent">
     <!-- Beginning map -->
     <section id="map-container">
-        <div id="map" role="application"></div>
+        <div id="map" aria-hidden="true"></div>
     </section>
     <!-- End map -->
     <!-- Beginning restaurant -->
     <section id="restaurant-container">
         <div id="name-and-image">
             <h1 id="restaurant-name"></h1>
-            <img id="restaurant-img" alt="restaurant sample image">
+            <img id="restaurant-img" alt="restaurant sample image" src="">
         </div>
         <div id="hours">
             <p id="restaurant-cuisine"></p>
@@ -63,14 +66,13 @@
 <!-- End footer -->
 
 <!-- Beginning scripts -->
-<!-- Database helpers -->
+<script src="https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js"></script>
 <script type="text/javascript" src="js/dbhelper.js"></script>
-<!-- Main javascript file -->
 <script type="text/javascript" src="js/restaurant_info.js"></script>
-<!-- Google Maps -->
+<script type="text/javascript" src="js/progressive-image.js"></script>
+
 <script async defer
         src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap"></script>
 <!-- End scripts -->
-
 </body>
 </html>

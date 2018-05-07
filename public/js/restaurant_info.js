@@ -1,47 +1,63 @@
 let restaurant;
 let map;
+const _dbPromise = DBHelper.openDatabase();
+
+/**
+ * Attempt to populate restaurants from cache before network
+ */
+const getCachedRestaurant = async (id) => {
+    const db = await _dbPromise;
+
+    if (!db || self.restaurant) return; // return if restaurants are already being displayed
+
+    const store = await db.transaction('restaurants').objectStore('restaurants');
+    const restaurants = await store.getAll();
+    // console.log(restaurants);
+    return restaurants.find(r => r.id == id);
+};
+
 
 /**
  * Initialize Google map, called from HTML.
  */
-window.initMap = () => {
-    fetchRestaurantFromURL((error, restaurant) => {
-        if (error) { // Got an error!
-            console.error(error);
-        } else {
-            self.map = new google.maps.Map(document.getElementById('map'), {
-                zoom: 16,
-                center: restaurant.latlng,
-                scrollwheel: false
-            });
-            fillBreadcrumb();
-            DBHelper.mapMarkerForRestaurant(self.restaurant, self.map);
-        }
+window.initMap = async () => {
+    const restaurant = await fetchRestaurantFromURL();
+    if (!restaurant) return;
+    self.map = new google.maps.Map(document.getElementById('map'), {
+        zoom: 16,
+        center: restaurant.latlng,
+        scrollwheel: false
     });
+    fillBreadcrumb();
+    DBHelper.mapMarkerForRestaurant(self.restaurant, self.map);
 };
 
 /**
  * Get current restaurant from page URL.
  */
-fetchRestaurantFromURL = (callback) => {
+fetchRestaurantFromURL = async () => {
     if (self.restaurant) { // restaurant already fetched!
-        callback(null, self.restaurant);
-        return;
+        return self.restaurant;
     }
     const id = getParameterByName('id');
     if (!id) { // no id found in URL
-        error = 'No restaurant id in URL';
-        callback(error, null);
-    } else {
-        DBHelper.fetchRestaurantById(id, (error, restaurant) => {
-            self.restaurant = restaurant;
-            if (!restaurant) {
-                console.error(error);
-                return;
-            }
-            fillRestaurantHTML();
-            callback(null, restaurant)
-        });
+        const error = 'No restaurant id in URL';
+        console.warn(error);
+        return false;
+    }
+
+    let restaurant = await getCachedRestaurant(id);
+    if (restaurant) {
+        self.restaurant = restaurant;
+        fillRestaurantHTML();
+        return restaurant;
+    }
+
+    restaurant = await DBHelper.fetchRestaurantById(id);
+    if (restaurant) {
+        self.restaurant = restaurant;
+        fillRestaurantHTML();
+        return restaurant;
     }
 };
 
@@ -57,7 +73,8 @@ fillRestaurantHTML = (restaurant = self.restaurant) => {
 
     const image = document.getElementById('restaurant-img');
     image.className = 'restaurant-img';
-    image.src = DBHelper.imageUrlForRestaurant(restaurant);
+    image.src = DBHelper.jpgUrlForRestaurant(restaurant);
+    image.srcset = DBHelper.webpUrlForRestaurant(restaurant);
 
     const cuisine = document.getElementById('restaurant-cuisine');
     cuisine.innerHTML = restaurant.cuisine_type;
@@ -87,7 +104,7 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
         row.appendChild(time);
 
         hours.appendChild(row);
-    })
+    });
 };
 
 /**
@@ -173,3 +190,17 @@ getParameterByName = (name, url) => {
         return '';
     return decodeURIComponent(results[2].replace(/\+/g, ' '));
 };
+
+/**
+ * Register service worker
+ */
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+        try {
+            const registration = await navigator.serviceWorker.register('/service-worker.js');
+            console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+        } catch (e) {
+            console.log(`Serviceworker registration failed.`);
+        }
+    });
+}
