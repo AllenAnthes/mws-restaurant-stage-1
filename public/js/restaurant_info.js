@@ -1,6 +1,8 @@
-let restaurant;
-let map;
+var restaurant;
+var reviews;
+var map;
 const _dbPromise = DBHelper.openDatabase();
+
 
 /**
  * Attempt to populate restaurants from cache before network
@@ -11,21 +13,73 @@ const getCachedRestaurant = async (id) => {
     if (!db || self.restaurant) return; // return if restaurants are already being displayed
 
     const store = await db.transaction('restaurants').objectStore('restaurants');
-    const restaurants = await store.getAll();
-    // console.log(restaurants);
-    return restaurants.find(r => r.id == id);
+    const restaurant = await store.get(parseInt(id));
+    if (restaurant) {
+        self.restaurant = restaurant;
+        fillRestaurantHTML(restaurant);
+    }
 };
 
+const getCachedReviews = async (id) => {
+    const db = await _dbPromise;
+
+    if (!db || self.reviews) return; // return if reviews are already being displayed
+
+    const index = await db.transaction('reviews')
+        .objectStore('reviews')
+        .index('by-restaurant');
+
+    const reviews = await index.getAll(parseInt(id));
+    if (reviews) {
+        self.reviews = reviews;
+        fillReviewsHTML();
+    }
+};
+
+const cacheReviews = async (reviews = self.reviews) => {
+    const db = await _dbPromise;
+
+    if (db) {
+        const tx = db.transaction('reviews', 'readwrite');
+        const store = await tx.objectStore('reviews');
+        reviews.forEach(review => store.put(review));
+        return tx.complete;
+    }
+};
+
+const cacheRestaurant = async (restaurant = self.restaurant) => {
+    const db = await _dbPromise;
+
+    if (db) {
+        const tx = db.transaction('restaurants', 'readwrite');
+        const store = await tx.objectStore('restaurants');
+        store.put(restaurant);
+        return tx.complete;
+    }
+};
 
 /**
  * Initialize Google map, called from HTML.
  */
 window.initMap = async () => {
-    const restaurant = await fetchRestaurantFromURL();
-    if (!restaurant) return;
+    const id = getParameterByName('id');
+    if (!id) { // no id found in URL
+        console.warn('No restaurant id in URL');
+        return;
+    }
+
+    await Promise.all([getCachedReviews(id), getCachedRestaurant(id)]);
+
+    if (!self.restaurant) { //  If cache misses we have to wait for network data
+        await fetchDataFromNetwork(id);
+    } else { // else we'll get it eventually
+        fetchDataFromNetwork(id);
+    }
+
+    if (!self.restaurant) return;
     self.map = new google.maps.Map(document.getElementById('map'), {
         zoom: 16,
-        center: restaurant.latlng,
+        center: self.restaurant.latlng,
         scrollwheel: false
     });
     fillBreadcrumb();
@@ -35,36 +89,27 @@ window.initMap = async () => {
 /**
  * Get current restaurant from page URL.
  */
-fetchRestaurantFromURL = async () => {
-    if (self.restaurant) { // restaurant already fetched!
-        return self.restaurant;
-    }
-    const id = getParameterByName('id');
-    if (!id) { // no id found in URL
-        const error = 'No restaurant id in URL';
-        console.warn(error);
-        return false;
+const fetchDataFromNetwork = async (id) => {
+    const restaurant = await DBHelper.fetchRestaurantById(id);
+    if (restaurant && self.restaurant !== restaurant) { // only update if different from cached
+        self.restaurant = restaurant;
+        fillRestaurantHTML(restaurant);
+        cacheRestaurant(restaurant);
     }
 
-    let restaurant = await getCachedRestaurant(id);
-    if (restaurant) {
-        self.restaurant = restaurant;
-        fillRestaurantHTML();
-        return restaurant;
-    }
-
-    restaurant = await DBHelper.fetchRestaurantById(id);
-    if (restaurant) {
-        self.restaurant = restaurant;
-        fillRestaurantHTML();
-        return restaurant;
+    const reviews = await DBHelper.fetchReviewsByRestarauntId(id);
+    if (reviews && self.reviews !== reviews) { // only update if different from cached
+        self.reviews = reviews;
+        fillReviewsHTML();
+        cacheReviews(reviews);
     }
 };
 
 /**
  * Create restaurant HTML and add it to the webpage
  */
-fillRestaurantHTML = (restaurant = self.restaurant) => {
+const fillRestaurantHTML = (restaurant) => {
+    if (!restaurant) return;
     const name = document.getElementById('restaurant-name');
     name.innerHTML = restaurant.name;
 
@@ -90,8 +135,9 @@ fillRestaurantHTML = (restaurant = self.restaurant) => {
 /**
  * Create restaurant operating hours HTML table and add it to the webpage.
  */
-fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => {
+const fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => {
     const hours = document.getElementById('restaurant-hours');
+    hours.innerHTML = '';
     Object.keys(operatingHours).forEach(key => {
         const row = document.createElement('tr');
 
@@ -110,29 +156,41 @@ fillRestaurantHoursHTML = (operatingHours = self.restaurant.operating_hours) => 
 /**
  * Create all reviews HTML and add them to the webpage.
  */
-fillReviewsHTML = (reviews = self.restaurant.reviews) => {
+const fillReviewsHTML = (reviews = self.reviews) => {
+    resetReviews(reviews);
     const container = document.getElementById('reviews-container');
-    const title = document.createElement('h2');
-    title.innerHTML = 'Reviews';
-    container.appendChild(title);
 
-    if (!reviews) {
+    if (!reviews || reviews.length === 0) {
+        const ul = document.getElementById('reviews-list');
         const noReviews = document.createElement('p');
         noReviews.innerHTML = 'No reviews yet!';
-        container.appendChild(noReviews);
-        return;
+        ul.appendChild(noReviews);
+    } else {
+        const ul = document.getElementById('reviews-list');
+        reviews.forEach(review => {
+            ul.appendChild(createReviewHTML(review));
+        });
+        container.appendChild(ul);
     }
-    const ul = document.getElementById('reviews-list');
-    reviews.forEach(review => {
-        ul.appendChild(createReviewHTML(review));
-    });
-    container.appendChild(ul);
 };
+
+/**
+ * Clear current restaurants, their HTML and remove their map markers.
+ */
+const resetReviews = (reviews) => {
+    // Remove all reviews
+    self.reviews = [];
+    const ul = document.getElementById('reviews-list');
+    ul.innerHTML = '';
+
+    self.reviews = reviews;
+};
+
 
 /**
  * Create review HTML and add it to the webpage.
  */
-createReviewHTML = (review) => {
+const createReviewHTML = (review) => {
     const li = document.createElement('li');
     const reviewHeader = document.createElement('div');
     reviewHeader.className = 'review-header';
@@ -144,7 +202,7 @@ createReviewHTML = (review) => {
     reviewHeader.appendChild(name);
 
     const date = document.createElement('p');
-    date.innerHTML = review.date;
+    date.innerHTML = new Date(review.createdAt).toLocaleString();
     date.className = 'review-date';
     reviewHeader.appendChild(date);
 
@@ -168,7 +226,7 @@ createReviewHTML = (review) => {
 /**
  * Add restaurant name to the breadcrumb navigation menu
  */
-fillBreadcrumb = (restaurant = self.restaurant) => {
+const fillBreadcrumb = (restaurant = self.restaurant) => {
     const breadcrumb = document.getElementById('breadcrumb');
     const li = document.createElement('li');
     li.innerHTML = restaurant.name;
@@ -178,7 +236,7 @@ fillBreadcrumb = (restaurant = self.restaurant) => {
 /**
  * Get a parameter by name from page URL.
  */
-getParameterByName = (name, url) => {
+const getParameterByName = (name, url) => {
     if (!url)
         url = window.location.href;
     name = name.replace(/[\[\]]/g, '\\$&');
@@ -198,9 +256,9 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/service-worker.js');
-            console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+            // console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
         } catch (e) {
-            console.log(`Serviceworker registration failed.`);
+            // console.log(`Serviceworker registration failed.`);
         }
     });
 }

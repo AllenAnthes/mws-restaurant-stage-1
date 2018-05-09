@@ -9,7 +9,7 @@ class DBHelper {
      */
     static get DATABASE_URL() {
         const port = 1337; // Change this to your server port
-        return `http://localhost:${port}/restaurants`;
+        return `http://localhost:${port}`;
 
         // local asset so we can provide access to the server via tunnel without having to spin up
         // a publicly accessible server.
@@ -18,11 +18,15 @@ class DBHelper {
 
     static openDatabase() {
         return idb.open('rest-reviews', 1, (upgradeDb) => {
-            const store = upgradeDb.createObjectStore('restaurants', {
+            const restaurantStore = upgradeDb.createObjectStore('restaurants', {
                 keyPath: 'id'
             });
-            store.createIndex('by-neighborhood', 'neighborhood');
-            store.createIndex('by-cuisine', 'cuisine_type');
+            restaurantStore.createIndex('by-neighborhood', 'neighborhood');
+            restaurantStore.createIndex('by-cuisine', 'cuisine_type');
+            const reviewStore = upgradeDb.createObjectStore('reviews', {
+                keyPath: 'id'
+            });
+            reviewStore.createIndex('by-restaurant', 'restaurant_id');
         });
     }
 
@@ -31,12 +35,26 @@ class DBHelper {
      */
     static async fetchRestaurants() {
         try {
-            const response = await fetch(DBHelper.DATABASE_URL);
+            const response = await fetch(`${DBHelper.DATABASE_URL}/restaurants`);
             const restaurants = await response.json();
-            // console.log(restaurants);
-            return restaurants;
+            return restaurants.map(r => ({
+                ...r,
+                is_favorite: r.is_favorite === true || r.is_favorite === 'true'
+            }));
         } catch (e) {
             console.warn(`Error in fetch restaurants: ${e}`);
+            return false;
+        }
+    }
+
+    static async fetchAllReviews() {
+        try {
+            const response = await fetch(`${DBHelper.DATABASE_URL}/reviews`);
+            const reviews = await response.json();
+            // console.log(reviews);
+            return reviews;
+        } catch (e) {
+            console.warn(`Error in fetch reviews: ${e}`);
             return false;
         }
     }
@@ -44,13 +62,35 @@ class DBHelper {
 
     /**
      * Fetch a restaurant by its ID.
+     * Fetch all restaurants as the request is most likely cached
      */
     static async fetchRestaurantById(id) {
         const restaurants = await DBHelper.fetchRestaurants();
-        if (!restaurants) return false;
+        if (restaurants) {
+            return restaurants.find(r => r.id == id);
+        } else {
+            return false;
+        }
 
-        return restaurants.find(r => r.id == id);
+    }
 
+    /**
+     * Fetch reviews for a restaurant by ID.
+     * Fetch all reviews as the request is most likely cached
+     */
+    static async fetchReviewsByRestarauntId(id) {
+        const reviews = await DBHelper.fetchAllReviews();
+        if (reviews) {
+            return reviews.filter(review => review.restaurant_id == id);
+        } else {
+            return false;
+        }
+    }
+
+    static async updateFavorite(id, is_favorite) {
+        return fetch(`${DBHelper.DATABASE_URL}/restaurants/${id}/?is_favorite=${is_favorite}`, {
+            method: 'PUT'
+        });
     }
 
     /**

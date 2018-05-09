@@ -1,10 +1,19 @@
-var restaurants,
-    neighborhoods,
-    cuisines;
-var map;
-var markers = [];
+const FILLED_HEART = '♥';
+const HEART_OUTLINE = '♡';
+
+// var restaurants,
+//     neighborhoods,
+//     cuisines;
+self.restaurants = [];
+self.neighborhoods = [];
+self.cuisines = [];
+self.map = {};
+self.markers = [];
+// var map;
+// var markers = [];
 
 const _dbPromise = DBHelper.openDatabase();
+
 
 /**
  * Fetch neighborhoods and cuisines as soon as the page is loaded.
@@ -12,7 +21,8 @@ const _dbPromise = DBHelper.openDatabase();
 document.addEventListener('DOMContentLoaded', async () => {
     await getCachedRestaurants();
     await fetchNeighborhoods();
-    await fetchCuisines();
+    fetchCuisines();
+    fetchReviews();
 });
 
 
@@ -133,6 +143,17 @@ const updateRestaurants = async () => {
     }
 };
 
+const fetchReviews = async () => {
+    const reviews = await DBHelper.fetchAllReviews();
+    const db = await _dbPromise;
+    if (reviews && db) {
+        const tx = db.transaction('reviews', 'readwrite');
+        const store = tx.objectStore('reviews');
+        reviews.forEach(review => store.put(review));
+        return tx.complete;
+    }
+};
+
 
 /**
  * Clear current restaurants, their HTML and remove their map markers.
@@ -189,15 +210,37 @@ const createRestaurantHTML = (restaurant) => {
     address.innerHTML = restaurant.address;
     li.append(address);
 
+    const footer = document.createElement('div');
+    footer.className = 'restaurant-footer';
+    li.append(footer);
+
     const more = document.createElement('a');
     more.setAttribute('Role', 'button');
     more.innerHTML = 'View Details';
     more.href = DBHelper.urlForRestaurant(restaurant);
     more.setAttribute('aria-label', `View details for ${restaurant.name}`);
     more.className = 'more-button';
-    li.append(more);
+    footer.appendChild(more);
+
+    const favorite = document.createElement('a');
+    favorite.setAttribute('Role', 'button');
+    favorite.innerHTML = restaurant.is_favorite ? FILLED_HEART : HEART_OUTLINE;
+    favorite.onclick = (e) => toggleFavorite(restaurant, e);
+    favorite.className = 'favorite-icon';
+    footer.appendChild(favorite);
+
 
     return li;
+};
+
+const toggleFavorite = async (restaurant, e) => {
+    restaurant.is_favorite = !restaurant.is_favorite;
+    e.target.innerHTML = restaurant.is_favorite ? FILLED_HEART : HEART_OUTLINE;
+
+    const db = await _dbPromise;
+    const store = db.transaction('restaurants', 'readwrite').objectStore('restaurants');
+    await store.put(restaurant);
+    DBHelper.updateFavorite(restaurant.id, restaurant.is_favorite);
 };
 
 /**
@@ -219,9 +262,9 @@ if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
             const registration = await navigator.serviceWorker.register('/service-worker.js');
-            console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+            // console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
         } catch (e) {
-            console.log(`Serviceworker registration failed.`);
+            // console.log(`Serviceworker registration failed.`);
         }
     });
 }

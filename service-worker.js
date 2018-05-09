@@ -17,20 +17,22 @@ const onInstalling = async (staticCacheName) => {
     return cache.addAll([
         '/',
         '/restaurant.html',
+        '/manifest.json',
         '/js/main.js',
         '/js/dbhelper.js',
         '/js/restaurant_info.js',
         '/js/progressive-image.js',
         '/css/styles.css',
         '/css/restaurant.css',
-        '/css/progressive-image.min.css'
+        '/css/progressive-image.min.css',
+        'https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js',
     ]);
 };
 
 self.addEventListener('install', (event) => {
-    console.log('Installing SW');
+    // console.log('Installing SW');
     event.waitUntil(onInstalling(staticCacheName));
-    console.log('Done installing SW');
+    // console.log('Done installing SW');
 });
 
 
@@ -45,9 +47,9 @@ const onActivate = async () => {
 };
 
 self.addEventListener('activate', (event) => {
-    console.log('Activating SW');
+    // console.log('Activating SW');
     event.waitUntil(onActivate());
-    console.log('Done activating SW');
+    // console.log('Done activating SW');
 
 });
 
@@ -73,7 +75,8 @@ self.addEventListener('fetch', (event) => {
             return;
         }
     }
-    if (requestUrl.href.startsWith('https://maps.googleapis.com/maps')) {
+    // if (requestUrl.href.startsWith('https://maps.googleapis.com/maps')) {
+    if (requestUrl.href.startsWith('https://maps.g')) {
         event.respondWith(
             serveFromCache(event.request, event.request.url, googleMapsCache)
         );
@@ -98,7 +101,7 @@ async function serveFromCache(request, url, cacheName) {
     const cache = await caches.open(cacheName);
     const response = await cache.match(url);
     if (response) {
-        // console.log(`Responding from ${cacheName}: ${url}`);
+        // // console.log(`Responding from ${cacheName}: ${url}`);
         return response;
     }
     try {
