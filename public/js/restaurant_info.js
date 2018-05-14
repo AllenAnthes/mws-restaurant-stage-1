@@ -1,3 +1,6 @@
+const FILLED_HEART = '❤️️️';
+const HEART_OUTLINE = '🖤';
+
 var restaurant;
 var reviews;
 var map;
@@ -20,10 +23,13 @@ const getCachedRestaurant = async (id) => {
     }
 };
 
+/**
+ * Attempts to fetch reviews from idb and populate html
+ */
 const getCachedReviews = async (id) => {
     const db = await _dbPromise;
 
-    if (!db || self.reviews) return; // return if reviews are already being displayed
+    if (!db) return;
 
     const index = await db.transaction('reviews')
         .objectStore('reviews')
@@ -31,30 +37,9 @@ const getCachedReviews = async (id) => {
 
     const reviews = await index.getAll(parseInt(id));
     if (reviews) {
-        self.reviews = reviews;
+        // self.reviews = reviews;
+        resetReviews(reviews);
         fillReviewsHTML();
-    }
-};
-
-const cacheReviews = async (reviews = self.reviews) => {
-    const db = await _dbPromise;
-
-    if (db) {
-        const tx = db.transaction('reviews', 'readwrite');
-        const store = await tx.objectStore('reviews');
-        reviews.forEach(review => store.put(review));
-        return tx.complete;
-    }
-};
-
-const cacheRestaurant = async (restaurant = self.restaurant) => {
-    const db = await _dbPromise;
-
-    if (db) {
-        const tx = db.transaction('restaurants', 'readwrite');
-        const store = await tx.objectStore('restaurants');
-        store.put(restaurant);
-        return tx.complete;
     }
 };
 
@@ -94,14 +79,14 @@ const fetchDataFromNetwork = async (id) => {
     if (restaurant && self.restaurant !== restaurant) { // only update if different from cached
         self.restaurant = restaurant;
         fillRestaurantHTML(restaurant);
-        cacheRestaurant(restaurant);
+        // cacheRestaurant(restaurant);
     }
 
     const reviews = await DBHelper.fetchReviewsByRestarauntId(id);
-    if (reviews && self.reviews !== reviews) { // only update if different from cached
+    if (reviews && self.reviews.length < reviews.length) { // only update if different from cached
         self.reviews = reviews;
         fillReviewsHTML();
-        cacheReviews(reviews);
+        // cacheReviews(reviews);
     }
 };
 
@@ -112,6 +97,12 @@ const fillRestaurantHTML = (restaurant) => {
     if (!restaurant) return;
     const name = document.getElementById('restaurant-name');
     name.innerHTML = restaurant.name;
+
+    const favorite = document.getElementById('favorite');
+    favorite.setAttribute('Role', 'button');
+    favorite.innerHTML = restaurant.is_favorite ? FILLED_HEART : HEART_OUTLINE;
+    favorite.onclick = (e) => Utils.toggleFavorite(restaurant, e);
+
 
     const address = document.getElementById('restaurant-address');
     address.innerHTML = restaurant.address;
@@ -171,6 +162,54 @@ const fillReviewsHTML = (reviews = self.reviews) => {
             ul.appendChild(createReviewHTML(review));
         });
         container.appendChild(ul);
+    }
+};
+
+/**
+ * Expands add review panel on button click
+ */
+const handleAddReviewClick = () => {
+    const panel = document.getElementById('panel');
+    if (panel.style.maxHeight) {
+        panel.style.maxHeight = null;
+    } else {
+        panel.style.maxHeight = panel.scrollHeight + 'px';
+    }
+};
+
+/**
+ *  Adds new review to the page, adds to offline store to be added later
+ *  if network connectivity isn't available
+ */
+const handleSubmit = async () => {
+    const name = document.getElementById('name').value;
+    const comments = document.getElementById('review-text').value;
+    const rating = document.querySelector('input[name="rating"]:checked').value;
+
+    const db = await _dbPromise;
+    const tx = db.transaction('reviews', 'readwrite');
+    const store = tx.objectStore('reviews');
+
+    const review = {
+        restaurant_id: self.restaurant.id,
+        name,
+        rating,
+        comments,
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+    };
+    store.add(review);
+    self.reviews.push(review);
+    document.getElementById('reviews-list')
+        .appendChild(createReviewHTML(review));
+    handleAddReviewClick();
+    try {
+        await DBHelper.addNewReview(review);
+    } catch (e) {
+        console.log('Failed to update remote.  Adding to offlineStore');
+        const offlineStore = db.transaction('offlineStore', 'readwrite').objectStore('offlineStore');
+        offlineStore.add(review);
+
     }
 };
 
@@ -255,10 +294,9 @@ const getParameterByName = (name, url) => {
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', async () => {
         try {
-            const registration = await navigator.serviceWorker.register('/service-worker.js');
-            // console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+            await navigator.serviceWorker.register('/service-worker.js');
         } catch (e) {
-            // console.log(`Serviceworker registration failed.`);
+            console.log(`Serviceworker registration failed.`);
         }
     });
 }

@@ -1,18 +1,14 @@
-const FILLED_HEART = '♥';
-const HEART_OUTLINE = '♡';
+const FILLED_HEART = '❤️️️';
+const HEART_OUTLINE = '🖤';
 
-// var restaurants,
-//     neighborhoods,
-//     cuisines;
 self.restaurants = [];
-self.neighborhoods = [];
-self.cuisines = [];
+self.neighborhoods = new Set();
+self.cuisines = new Set();
 self.map = {};
 self.markers = [];
-// var map;
-// var markers = [];
 
-const _dbPromise = DBHelper.openDatabase();
+let gmapsScriptAdded = false;
+const _dbPromise = DBHelper.db;
 
 
 /**
@@ -20,24 +16,48 @@ const _dbPromise = DBHelper.openDatabase();
  */
 document.addEventListener('DOMContentLoaded', async () => {
     await getCachedRestaurants();
-    await fetchNeighborhoods();
-    fetchCuisines();
-    fetchReviews();
+    await fetchNeighborhoodsAndCuisines();
+
+
+    if (self.restaurants.length === 0) {
+        await updateRestaurants();
+    }
+    DBHelper.fetchAllReviews();
 });
 
 
 /**
- * Update restaurants cache when fetched
+ * Onclick method for toggling map and appending gmaps script
  */
-const cacheRestaurants = async (restaurants) => {
-    const db = await _dbPromise;
-    if (!db || !restaurants) return;
+const displayMap = () => {
+    const mapContainer = document.getElementById('map-container');
 
-    const tx = db.transaction('restaurants', 'readwrite');
-    const store = tx.objectStore('restaurants');
-    restaurants.forEach(restaurant => store.put(restaurant));
-    return tx.complete;
+    if (mapContainer.style.maxHeight) {
+        mapContainer.style.maxHeight = null;
+        mapContainer.style.display = 'none';
+    } else {
+        if (!gmapsScriptAdded) {
+            addGoogleMapsScript();
+        }
+
+        mapContainer.style.display = 'block';
+        mapContainer.style.maxHeight = '100%';
+    }
 };
+
+/**
+ * Adds deferred google maps script to DOM when slider panel
+ * opened.
+ */
+const addGoogleMapsScript = () => {
+    const head = document.getElementsByTagName('head')[0];
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://maps.googleapis.com/maps/api/js?key=AIzaSyClGIH9TlfK1tBA9PF2vM0jiue552S-Y40&libraries=places&callback=initMap';
+    head.appendChild(script);
+    gmapsScriptAdded = true;
+};
+
 
 /**
  * Attempt to populate restaurants from cache before network
@@ -45,13 +65,23 @@ const cacheRestaurants = async (restaurants) => {
 const getCachedRestaurants = async () => {
     const db = await _dbPromise;
 
-    if (!db || self.restaurants) return; // return if restaurants are already being displayed
+    if (!db || self.restaurants.length !== 0) return; // return if restaurants are already being displayed
 
-    const store = await db.transaction('restaurants').objectStore('restaurants');
+    const store = db.transaction('restaurants').objectStore('restaurants');
     const restaurants = await store.getAll();
     // console.log(restaurants);
     self.restaurants = restaurants;
     if (restaurants) {
+        const neighborhoods = new Set();
+        restaurants.forEach(r => neighborhoods.add(r.neighborhood));
+        if (neighborhoods !== self.neighborhoods) {
+            fillNeighborhoodsHTML();
+        }
+        const cuisines = new Set();
+        restaurants.forEach(r => cuisines.add(r.cuisine_type));
+        if (cuisines !== self.cuisines) {
+            fillCuisinesHTML();
+        }
         fillRestaurantsHTML();
     }
 };
@@ -70,26 +100,23 @@ const fillNeighborhoodsHTML = (neighborhoods = self.neighborhoods) => {
 };
 
 /**
- * Fetch all neighborhoods and set their HTML.
+ * Populate neighborhoods and cuisines
  */
-const fetchNeighborhoods = async () => {
-    const neighborhoods = await DBHelper.fetchNeighborhoods();
-    if (neighborhoods) {
+const fetchNeighborhoodsAndCuisines = async () => {
+    const response = DBHelper.fetchNeighborhoods();
+    const cuisines = await DBHelper.fetchCuisines();
+    const neighborhoods = await response;
+
+    if (neighborhoods && neighborhoods !== self.neighborhoods) {
         self.neighborhoods = neighborhoods;
         fillNeighborhoodsHTML();
     }
-};
-
-/**
- * Fetch all cuisines and set their HTML.
- */
-const fetchCuisines = async () => {
-    const cuisines = await DBHelper.fetchCuisines();
-    if (cuisines) {
+    if (cuisines && cuisines !== self.cuisines) {
         self.cuisines = cuisines;
         fillCuisinesHTML();
     }
 };
+
 
 /**
  * Set cuisines HTML.
@@ -109,16 +136,18 @@ const fillCuisinesHTML = (cuisines = self.cuisines) => {
  * Initialize Google map, called from HTML.
  */
 window.initMap = async () => {
-    let loc = {
+    const loc = {
         lat: 40.722216,
         lng: -73.987501
     };
-    self.map = new google.maps.Map(document.getElementById('map'), {
-        zoom: 12,
+    self.map = await new google.maps.Map(document.getElementById('map'), {
+        zoom: 11,
         center: loc,
         scrollwheel: false
     });
     await updateRestaurants();
+    addMarkersToMap();
+
 };
 
 /**
@@ -137,23 +166,10 @@ const updateRestaurants = async () => {
     const restaurants = await DBHelper.fetchRestaurantByCuisineAndNeighborhood(cuisine, neighborhood);
     if (restaurants) {
         self.restaurants = restaurants;
-        await cacheRestaurants(restaurants);
         resetRestaurants(restaurants);
         fillRestaurantsHTML();
     }
 };
-
-const fetchReviews = async () => {
-    const reviews = await DBHelper.fetchAllReviews();
-    const db = await _dbPromise;
-    if (reviews && db) {
-        const tx = db.transaction('reviews', 'readwrite');
-        const store = tx.objectStore('reviews');
-        reviews.forEach(review => store.put(review));
-        return tx.complete;
-    }
-};
-
 
 /**
  * Clear current restaurants, their HTML and remove their map markers.
@@ -176,7 +192,6 @@ const resetRestaurants = (restaurants) => {
 const fillRestaurantsHTML = (restaurants = self.restaurants) => {
     const ul = document.getElementById('restaurants-list');
     restaurants.forEach(restaurant => ul.append(createRestaurantHTML(restaurant)));
-    addMarkersToMap();
 };
 
 /**
@@ -225,46 +240,34 @@ const createRestaurantHTML = (restaurant) => {
     const favorite = document.createElement('a');
     favorite.setAttribute('Role', 'button');
     favorite.innerHTML = restaurant.is_favorite ? FILLED_HEART : HEART_OUTLINE;
-    favorite.onclick = (e) => toggleFavorite(restaurant, e);
+    favorite.onclick = (e) => Utils.toggleFavorite(restaurant, e);
     favorite.className = 'favorite-icon';
     footer.appendChild(favorite);
-
-
     return li;
-};
-
-const toggleFavorite = async (restaurant, e) => {
-    restaurant.is_favorite = !restaurant.is_favorite;
-    e.target.innerHTML = restaurant.is_favorite ? FILLED_HEART : HEART_OUTLINE;
-
-    const db = await _dbPromise;
-    const store = db.transaction('restaurants', 'readwrite').objectStore('restaurants');
-    await store.put(restaurant);
-    DBHelper.updateFavorite(restaurant.id, restaurant.is_favorite);
 };
 
 /**
  * Add markers for current restaurants to the map.
  */
 const addMarkersToMap = (restaurants = self.restaurants) => {
-    restaurants.forEach(async restaurant => {
+    restaurants.forEach(restaurant => {
         // Add marker to the map
-        const marker = await DBHelper.mapMarkerForRestaurant(restaurant, self.map);
+        const marker = DBHelper.mapMarkerForRestaurant(restaurant, self.map);
         google.maps.event.addListener(marker, 'click', () => window.location.href = marker.url);
         self.markers.push(marker);
     });
 };
 
+
 /**
  * Register service worker
  */
 if ('serviceWorker' in navigator) {
-    window.addEventListener('load', async () => {
+    window.addEventListener('load', () => {
         try {
-            const registration = await navigator.serviceWorker.register('/service-worker.js');
-            // console.log(`ServiceWorker registration successful with scope: ${registration.scope}`);
+            navigator.serviceWorker.register('/service-worker.js');
         } catch (e) {
-            // console.log(`Serviceworker registration failed.`);
+            console.warn('Error when registering service worker', e);
         }
     });
 }

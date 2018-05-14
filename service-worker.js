@@ -1,3 +1,5 @@
+importScripts('js/dbhelper.js', 'https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js');
+
 const staticCacheName = 'restaurant-static-v1';
 const googleMapsCache = 'restaurant-maps-v1';
 const imageCacheName = 'restaurant-images-v1';
@@ -14,19 +16,23 @@ const allCaches = [
  */
 const onInstalling = async (staticCacheName) => {
     const cache = await caches.open(staticCacheName);
-    return cache.addAll([
-        '/',
-        '/restaurant.html',
-        '/manifest.json',
-        '/js/main.js',
-        '/js/dbhelper.js',
-        '/js/restaurant_info.js',
-        '/js/progressive-image.js',
-        '/css/styles.css',
-        '/css/restaurant.css',
-        '/css/progressive-image.min.css',
-        'https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js',
-    ]);
+    try {
+        return cache.addAll([
+            '/',
+            '/restaurant.html',
+            '/manifest.json',
+            '/js/main.js',
+            '/js/dbhelper.js',
+            '/js/restaurant_info.js',
+            '/js/progressive-image.js',
+            '/css/styles.css',
+            '/css/restaurant.css',
+            '/css/progressive-image.css',
+            'https://cdn.jsdelivr.net/npm/idb@2.0.4/lib/idb.min.js',
+        ]);
+    } catch (e) {
+        console.log('error in installing cache', e);
+    }
 };
 
 self.addEventListener('install', (event) => {
@@ -34,7 +40,6 @@ self.addEventListener('install', (event) => {
     event.waitUntil(onInstalling(staticCacheName));
     // console.log('Done installing SW');
 });
-
 
 /**
  * Deletes any new caches when a new SW activates
@@ -90,8 +95,6 @@ self.addEventListener('fetch', (event) => {
 /**
  * Utility function for interacting with cache
  *
- * TODO: Need to revisit this to see if we should change to a stale-while-revalidate strategy
- *
  * @param request   Request from the received event
  * @param url       Url of the resource.  Generally the url from
  *                  the request unless formatted for storage
@@ -105,7 +108,7 @@ async function serveFromCache(request, url, cacheName) {
         return response;
     }
     try {
-        const networkResponse = await fetch(request);
+        const networkResponse = await fetch(request).catch((e) => console.log('error', e));
         await cache.put(url, networkResponse.clone());
         return networkResponse;
     } catch (ex) {
@@ -127,7 +130,6 @@ async function checkAllCaches(request) {
     try {
         return await fetch(request);
     } catch (e) {
-        console.warn(`Cache missed and network fetch threw error: ${e}\nRequest URL: ${request.url}`);
-        return new Response();
+        console.warn('Cache missed and network fetch threw error:', e, `Request URL: ${request.url}`);
     }
 }

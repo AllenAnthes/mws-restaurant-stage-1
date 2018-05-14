@@ -1,6 +1,6 @@
-import express from 'express'
-import cors from 'cors'
-import path from 'path'
+const express = require('express');
+const cors = require('cors');
+const path = require('path');
 
 /**
  * Express app for easier development
@@ -10,14 +10,6 @@ import path from 'path'
 const app = express();
 app.use(cors());
 app.use(express.static(path.join(__dirname, 'public')));
-
-
-/**
- * Route created so we can add CORS header
- */
-app.get('/data/restaurants.json', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'data', 'restaurants.json'));
-});
 
 app.get('/service-worker.js', (req, res) => {
     res.sendFile(path.join(__dirname, 'service-worker.js'));
